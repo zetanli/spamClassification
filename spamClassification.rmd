@@ -1,1 +1,26 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
 
+```{r}
+library(sparsediscrim)
+library(e1071)
+library(snow)
+```
+## 2 Spam classification  
+##choose log transformation  
+```{r}
+spam_train=read.table('spam-train.txt',header=F,sep=',')
+spam_test=read.table('spam-test.txt',header=F,sep=',')
+log_tr=log(spam_train[,1:57]+1)
+log_te=log(spam_test[,1:57]+1)
+tr_c=spam_train[,58]
+te_c=spam_test[,58]
+log_tr=data.frame(log_tr,tr_c)
+log_te=data.frame(log_te,te_c)
+names(log_te)[58]='v58'
+names(log_tr)[58]='v58'
+```
+##SVM
+Change cost for all 
+And change gamma for Gaussian
