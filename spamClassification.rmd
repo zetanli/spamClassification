@@ -6,9 +6,13 @@ knitr::opts_chunk$set(echo = TRUE)
 library(sparsediscrim)
 library(e1071)
 library(snow)
+library(ggplot2)
+library(neuralnet)
+library(nnet)
+library(rpart)
 ```
-## 2 Spam classification  
-##choose log transformation  
+##Spam classification  
+choose log transformation  
 ```{r}
 spam_train=read.table('spam-train.txt',header=F,sep=',')
 spam_test=read.table('spam-test.txt',header=F,sep=',')
@@ -21,6 +25,169 @@ log_te=data.frame(log_te,te_c)
 names(log_te)[58]='v58'
 names(log_tr)[58]='v58'
 ```
+
 ##SVM
-Change cost for all 
-And change gamma for Gaussian
+change cost for all   
+
+```{r}
+##write a function with train and test dataset, kernel, cost and cv folds as its arguments and cv error, test error as output
+cv_cost_svm=function(datatrain,datatest,cost,kernel,fold)
+{
+  folds = cv_partition(datatrain[,58], num_folds=fold)
+  cverr = sapply(folds, function(fol) {
+  svmcv = svm(as.factor(v58)~., dat=datatrain[fol$training,],kernel=kernel, cost=cost)
+  svmpred = predict(svmcv, datatrain[fol$test,])
+  mean(svmpred != datatrain[fol$test,58])})
+  cv_error = mean(cverr)
+  model=svm(as.factor(v58)~., dat=datatrain,kernel=kernel, cost=cost)
+  test_error=mean(predict(model, datatest) != datatest$v58)
+  return(c(cv_error,test_error))
+}
+##get costs range
+svmcosts=exp(-5:5)
+poly_result=lapply(svmcosts,cv_cost_svm,datatrain=log_tr,datatest=log_te,kernel='polynomial',fold=3)
+polyf=data.frame(matrix(unlist(poly_result),nrow=11,byrow=T),cost=svmcosts,kernel='polynomial')
+radial_result=lapply(svmcosts,cv_cost_svm,datatrain=log_tr,datatest=log_te,kernel='radial',fold=3)
+radialf=data.frame(matrix(unlist(radial_result),nrow=11,byrow=T),cost=svmcosts,kernel='radial')
+linear_result=lapply(svmcosts,cv_cost_svm,datatrain=log_tr,datatest=log_te,kernel='linear',fold=3)
+linearf=data.frame(matrix(unlist(linear_result),nrow=11,byrow=T),cost=svmcosts,kernel='linear')
+svmcf=rbind(radialf,linearf,polyf)
+names(svmcf)[1:2]=c('cv_error','test_error')
+ggplot(svmcf)+geom_line(aes(cost,cv_error,color=kernel))+geom_line(aes(cost,test_error,color=kernel),linetype='dashed') +ylab('CV Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+
+  ggtitle('error rate for different cost')+ylab('Error rate')
+```
+
+change gamma for svm
+
+```{r}
+cv_gamma_svm=function(datatrain,datatest,cost,fold,gamma)
+{
+  folds = cv_partition(datatrain[,58], num_folds=fold)
+  cverr = sapply(folds, function(fol) {
+ svmcv = svm(as.factor(v58)~., dat=datatrain[fol$training,],kernel='radial', cost=cost,gamma=gamma)
+
+ svmpred = predict(svmcv, datatrain[fol$test,])
+ 
+ mean(svmpred != datatrain[fol$test,58])})
+  
+  cv_error = mean(cverr)
+  
+  model=svm(as.factor(v58)~., dat=datatrain,kernel='radial', cost=cost,gamma=gamma)
+  
+  test_error=mean(predict(model, datatest) != datatest$v58)
+  
+  return(c(cv_error,test_error))
+}
+
+gammas=exp(-4:2)
+gamma_result=lapply(gammas,cv_gamma_svm,datatrain=log_tr,datatest=log_te,cost=50,fold=3)
+gammadf=data.frame(matrix(unlist(gamma_result),nrow=7,byrow=T),gamma=gammas)
+names(gammadf)[1:2]=c('cv_error','test_error')
+ggplot(gammadf)+geom_line(aes(gamma,X1)) +geom_line(aes(gamma,X2),linetype='dashed')+ylab('Error') +ggtitle('error rate for different gamma')
+```
+change degree for polynomial
+
+```{r}
+##degree
+cv_degree_svm=function(datatrain,datatest,degree,cost,fold)
+{
+  folds = cv_partition(datatrain[,58], num_folds=fold)
+  cverr = sapply(folds, function(fol) {
+ svmcv = svm(as.factor(v58)~., dat=datatrain[fol$training,],kernel='polynomial', cost=cost,degree=degree)
+
+ svmpred = predict(svmcv, datatrain[fol$test,])
+ 
+ mean(svmpred != datatrain[fol$test,58])})
+  cv_error=mean(cverr)
+  model=svm(as.factor(v58)~., dat=datatrain,kernel='polynomial', cost=cost,degree=degree)
+  test_error=mean(predict(model, datatest) != datatest$v58)
+  
+  return(c(cv_error,test_error))
+}
+
+degrees=c(1:10)
+deg_result=lapply(degrees,cv_degree_svm,datatrain=log_tr,datatest=log_te,cost=50,fold=3)
+degdf=data.frame(matrix(unlist(deg_result),nrow=10,byrow=T),degree=degrees)
+names(degreedf)[1:2]=c('cv_error','test_error')
+ggplot(degdf)+geom_line(aes(degree,X1))+geom_line(aes(degree,X2),linetype='dashed') +ylab('Error') +ggtitle('error rate for different degree')
+
+```
+#Neural Network
+```{r}
+data_trs=function(data){
+  tran = cbind(data, class.ind(as.factor(data$v58)))
+  colnames(tran)[59:60]=c('c1','c2')
+  return(tran)
+}
+
+pred_nn = function(nn, dat) {
+  yhat = compute(nn, dat[,1:57])$net.result
+  yhat = apply(yhat, 1, which.max)-1
+  return(yhat)
+}
+
+CV_neural=function(datatrain,datatest,layer,nodes,fold)
+{
+  datatrain=data_trs(datatrain)
+  datatest=data_trs(datatest)
+  folds = cv_partition(datatrain[,58], num_folds=fold)
+  
+  cverr = sapply(folds, function(fold) {
+ nncv = neuralnet( formula(paste('c1+c2 ~',paste(paste0('V',1:57), collapse='+'))),data =datatrain[fold$training,],hidden=rep(nodes,layer),linear.output=FALSE,lifesign = 'full')
+ nnpred = pred_nn(nncv, datatrain[fold$test,])
+ mean(nnpred != datatrain[fold$test,58])})
+  
+  cv_error = mean(cverr)
+  model= neuralnet( formula(paste('c1+c2 ~',paste(paste0('V',1:57), collapse='+'))),data =datatrain,hidden=rep(nodes,layer),linear.output=FALSE,lifesign = 'full')
+  test_error=mean(pred_nn(model, datatest) != datatest$v58)
+  return(c(cv_error,test_error))
+}  
+##layer=1
+nodes=seq(10, 50, 5)
+lay1_result=lapply(nodes,CV_neural,datatrain=log_tr,datatest=log_te,layer=1,fold=3)
+lay1f=data.frame(matrix(unlist(lay1_result),nrow=9,byrow=T),nodes,layer='layer1')
+##layer=2
+
+lay2_result=lapply(nodes,CV_neural,datatrain=log_tr,datatest=log_te,layer=2,fold=3)
+lay2f=data.frame(matrix(unlist(lay2_result),nrow=9,byrow=T),nodes,layer='layer2')
+layf=rbind(lay1f,lay2f)
+ggplot(layf)+geom_line(aes(nodes,X1,color=layer)) +geom_line(aes(nodes,X2,color=layer),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+
+  ggtitle('error rate for different nodes')  
+```  
+
+# decision tree
+```{r}
+cv_error_tree = function(datatrain,datatest,cp,fold){
+    
+  folds = cv_partition(datatrain[,58], num_folds=fold)
+  #CV error
+    cvtree = sapply(folds, function(fol) {
+    treecv=rpart(as.factor(v58)~.,data = datatrain[fol$training,],control = rpart.control(cp=cp))
+    treepred =predict(treecv,datatrain[fol$test,],type="class")
+    mean(treepred != datatrain[fol$test,58])
+     })
+  
+  cv_error = mean(cvtree)
+  
+  model=rpart(as.factor(v58)~.,data = datatrain,control = rpart.control(cp=cp))
+  test_error = mean( predict(model,datatest,type="class") != datatest$v58)
+  return(c(cv_error,test_error))
+}
+
+cps=seq(0,0.05,0.001)  
+tree_result= lapply(cps,cv_error_tree,datatrain=log_tr,datatest=log_te,fold=3)
+treef=data.frame(matrix(unlist(tree_result),nrow=51,byrow=T),cp=cps)
+ggplot(treef)+geom_line(aes(cp,X1)) +geom_line(aes(cp,X2),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+
+  ggtitle('error rate for different tree size')
+  
+  
+
+
+
+
+```
+
+
+
+
+
