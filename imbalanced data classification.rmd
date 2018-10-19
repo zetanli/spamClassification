@@ -1,1 +1,263 @@
-We re-sample the dataset to 
+We re-sample the training data to obtain more skewed class ratios(3:7, 2:8, and 1:9)
+
+```{r}
+##subsample training data
+ins_tr=which(log_tr$v58==1)
+ins_te=which(log_te$v58==1)
+c_tr=dim(log_tr[log_tr$v58==0,])[1]
+c_te=dim(log_tr[log_te$v58==0,])[1]
+size37_tr=round(c_tr*3/7)
+size28_tr=round(c_tr*2/8)
+size19_tr=round(c_tr*1/9)
+
+size37_te=round(c_te*3/7)
+size28_te=round(c_te*2/8)
+size19_te=round(c_te*1/9)
+
+train37=rbind(log_tr[sample(ins_tr,size37_tr,replace=T),],log_tr[-ins_tr,])
+train28=rbind(log_tr[sample(ins_tr,size28_tr,replace=T),],log_tr[-ins_tr,])
+train19=rbind(log_tr[sample(ins_tr,size19_tr,replace=T),],log_tr[-ins_tr,])
+
+test37=rbind(log_te[sample(ins_te,size37_te,replace=T),],log_te[-ins_te,])
+test28=rbind(log_te[sample(ins_te,size28_te,replace=T),],log_te[-ins_te,])
+test19=rbind(log_te[sample(ins_te,size19_te,replace=T),],log_te[-ins_te,])
+
+##Acquire those methods' results from skewed datasets
+##svm
+##change cost
+poly_result37=lapply(svmcosts,cv_cost_svm,datatrain=train37,datatest=test37,kernel='polynomial',fold=3)
+radial_result37=lapply(svmcosts,cv_cost_svm,datatrain=train37,datatest=test37,kernel='radial',fold=3)
+linear_result37=lapply(svmcosts,cv_cost_svm,datatrain=train37,datatest=test37,kernel='linear',fold=3)
+
+poly_result28=lapply(svmcosts,cv_cost_svm,datatrain=train28,datatest=test28,kernel='polynomial',fold=3)
+radial_result28=lapply(svmcosts,cv_cost_svm,datatrain=train28,datatest=test28,kernel='radial',fold=3)
+linear_result28=lapply(svmcosts,cv_cost_svm,datatrain=train28,datatest=test28,kernel='linear',fold=3)
+
+poly_result19=lapply(svmcosts,cv_cost_svm,datatrain=train19,datatest=test19,kernel='polynomial',fold=3)
+radial_result19=lapply(svmcosts,cv_cost_svm,datatrain=train19,datatest=test19,kernel='radial',fold=3)
+linear_result19=lapply(svmcosts,cv_cost_svm,datatrain=train19,datatest=test19,kernel='linear',fold=3)
+
+polyf37=data.frame(matrix(unlist(poly_result37),nrow=11,byrow=T),cost=svmcosts,kernel='polynomial')
+radialf37=data.frame(matrix(unlist(radial_result37),nrow=11,byrow=T),cost=svmcosts,kernel='radial')
+linearf37=data.frame(matrix(unlist(linear_result37),nrow=11,byrow=T),cost=svmcosts,kernel='linear')
+svmcf37=rbind(radialf37,linearf37,polyf37)
+
+polyf28=data.frame(matrix(unlist(poly_result28),nrow=11,byrow=T),cost=svmcosts,kernel='polynomial')
+radialf28=data.frame(matrix(unlist(radial_result28),nrow=11,byrow=T),cost=svmcosts,kernel='radial')
+linearf28=data.frame(matrix(unlist(linear_result28),nrow=11,byrow=T),cost=svmcosts,kernel='linear')
+svmcf28=rbind(radialf28,linearf28,polyf28)
+
+polyf19=data.frame(matrix(unlist(poly_result19),nrow=11,byrow=T),cost=svmcosts,kernel='polynomial')
+radialf19=data.frame(matrix(unlist(radial_result19),nrow=11,byrow=T),cost=svmcosts,kernel='radial')
+linearf19=data.frame(matrix(unlist(linear_result19),nrow=11,byrow=T),cost=svmcosts,kernel='linear')
+svmcf19=rbind(radialf19,linearf19,polyf19)
+
+g1=ggplot(svmcf37)+geom_line(aes(cost,X1,color=kernel))+geom_line(aes(cost,X2,color=kernel),linetype='dashed') +ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+
+  ggtitle('error rate for different cost')+ylab('Error rate')
+
+g2=ggplot(svmcf28)+geom_line(aes(cost,X1,color=kernel))+geom_line(aes(cost,X2,color=kernel),linetype='dashed') +ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+
+  ggtitle('error rate for different cost')+ylab('Error rate')
+
+g3=ggplot(svmcf19)+geom_line(aes(cost,X1,color=kernel))+geom_line(aes(cost,X2,color=kernel),linetype='dashed') +ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+
+  ggtitle('error rate for different cost')+ylab('Error rate')
+
+library(gridExtra)
+grid.arrange(g1,g2,g3,nrow=2)
+##change gamma for Gaussian kernel
+gamma_result37=lapply(gammas,cv_gamma_svm,datatrain=train37,datatest=test37,cost=50,fold=3)
+gamma_result28=lapply(gammas,cv_gamma_svm,datatrain=train28,datatest=test28,cost=50,fold=3)
+gamma_result19=lapply(gammas,cv_gamma_svm,datatrain=train19,datatest=test19,cost=50,fold=3)
+gammadf37=data.frame(matrix(unlist(gamma_result37),nrow=7,byrow=T),gamma=gammas)
+gammadf28=data.frame(matrix(unlist(gamma_result28),nrow=7,byrow=T),gamma=gammas)
+gammadf19=data.frame(matrix(unlist(gamma_result19),nrow=7,byrow=T),gamma=gammas)
+g4=ggplot(gammadf37)+geom_line(aes(gamma,X1)) +geom_line(aes(gamma,X2),linetype='dashed')+ylab('Error') +ggtitle('error rate for different gamma')
+g5=ggplot(gammadf28)+geom_line(aes(gamma,X1)) +geom_line(aes(gamma,X2),linetype='dashed')+ylab('Error') +ggtitle('error rate for different gamma')
+g6=ggplot(gammadf19)+geom_line(aes(gamma,X1)) +geom_line(aes(gamma,X2),linetype='dashed')+ylab('Error') +ggtitle('error rate for different gamma')
+grid.arrange(g4,g5,g6,nrow=2)
+
+##change degree for polynomial kernel
+deg_result37=lapply(degrees,cv_degree_svm,datatrain=train37,datatest=test37,cost=50,fold=3)
+deg_result28=lapply(degrees,cv_degree_svm,datatrain=train28,datatest=test28,cost=50,fold=3)
+deg_result19=lapply(degrees,cv_degree_svm,datatrain=train19,datatest=test19,cost=50,fold=3)
+degdf37=data.frame(matrix(unlist(deg_result37),nrow=10,byrow=T),degree=degrees)
+degdf28=data.frame(matrix(unlist(deg_result28),nrow=10,byrow=T),degree=degrees)
+degdf19=data.frame(matrix(unlist(deg_result19),nrow=10,byrow=T),degree=degrees)
+g7=ggplot(degdf37)+geom_line(aes(degree,X1))+geom_line(aes(degree,X2),linetype='dashed') +ylab('Error') +ggtitle('error rate for different degree')
+g8=ggplot(degdf28)+geom_line(aes(degree,X1))+geom_line(aes(degree,X2),linetype='dashed') +ylab('Error') +ggtitle('error rate for different degree')
+g9=ggplot(degdf19)+geom_line(aes(degree,X1))+geom_line(aes(degree,X2),linetype='dashed') +ylab('Error') +ggtitle('error rate for different degree')
+grid.arrange(g7,g8,g9,nrow=2)
+##neural network
+lay1_result37=lapply(nodes,CV_neural,datatrain=train37,datatest=test37,layer=1,fold=3)
+lay1_result28=lapply(nodes,CV_neural,datatrain=train28,datatest=test28,layer=1,fold=3)
+lay1_result19=lapply(nodes,CV_neural,datatrain=train19,datatest=test19,layer=1,fold=3)
+lay1f37=data.frame(matrix(unlist(lay1_result37),nrow=9,byrow=T),nodes,layer='layer1')
+lay1f28=data.frame(matrix(unlist(lay1_result28),nrow=9,byrow=T),nodes,layer='layer1')
+lay1f19=data.frame(matrix(unlist(lay1_result19),nrow=9,byrow=T),nodes,layer='layer1')
+
+
+lay2_result37=lapply(nodes,CV_neural,datatrain=train37,datatest=test37,layer=2,fold=3)
+lay2_result28=lapply(nodes,CV_neural,datatrain=train28,datatest=test28,layer=2,fold=3)
+lay2_result19=lapply(nodes,CV_neural,datatrain=train19,datatest=test19,layer=2,fold=3)
+lay2f37=data.frame(matrix(unlist(lay2_result37),nrow=9,byrow=T),nodes,layer='layer2')
+lay2f28=data.frame(matrix(unlist(lay2_result28),nrow=9,byrow=T),nodes,layer='layer2')
+lay2f19=data.frame(matrix(unlist(lay2_result19),nrow=9,byrow=T),nodes,layer='layer2')
+layf37=rbind(lay1f37,lay2f37)
+layf28=rbind(lay1f28,lay2f28)
+layf19=rbind(lay1f19,lay2f19)
+g10=ggplot(data=layf37)+geom_line(aes(nodes,X1,color=layer)) +geom_line(aes(nodes,X2,color=layer),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different nodes')
+g11=ggplot(layf28)+geom_line(aes(nodes,X1,color=layer)) +geom_line(aes(nodes,X2,color=layer),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different nodes')
+g12=ggplot(layf19)+geom_line(aes(nodes,X1,color=layer)) +geom_line(aes(nodes,X2,color=layer),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different nodes')
+grid.arrange(g10,g11,g12,nrow=2)
+##decision tree
+tree_result37= lapply(cps,cv_error_tree,datatrain=train37,datatest=test37,fold=3)
+tree_result28= lapply(cps,cv_error_tree,datatrain=train28,datatest=test28,fold=3)
+tree_result19= lapply(cps,cv_error_tree,datatrain=train19,datatest=test19,fold=3)
+treef37=data.frame(matrix(unlist(tree_result37),nrow=51,byrow=T),cp=cps)
+treef28=data.frame(matrix(unlist(tree_result28),nrow=51,byrow=T),cp=cps)
+treef19=data.frame(matrix(unlist(tree_result19),nrow=51,byrow=T),cp=cps)
+
+g13=ggplot(treef37)+geom_line(aes(cp,X1)) +geom_line(aes(cp,X2),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different tree size')
+g14=ggplot(treef28)+geom_line(aes(cp,X1)) +geom_line(aes(cp,X2),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different tree size')
+g15=ggplot(treef19)+geom_line(aes(cp,X1)) +geom_line(aes(cp,X2),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different tree size')
+grid.arrange(g13,g14,g15,nrow=2)
+```
+
+After finished that, we will try to ameliorate results from imbalanced datasets. A simple way is using bootstrap method to generate for the underrepresented class with more instances.
+
+```{r}
+
+retrain19=rbind(train19[sample(which(train19$v58==1),c_tr,replace=T),],log_tr[-ins_tr,])
+retest19=rbind(test19[sample(which(test19$v58==1),c_tr,replace=T),],log_te[-ins_te,])
+
+retrain28=rbind(train28[sample(which(train28$v58==1),c_tr,replace=T),],log_tr[-ins_tr,])
+retest28=rbind(test28[sample(which(test28$v58==1),c_tr,replace=T),],log_te[-ins_te,])
+
+retrain37=rbind(train37[sample(which(train37$v58==1),c_tr,replace=T),],log_tr[-ins_tr,])
+retest37=rbind(test37[sample(which(test37$v58==1),c_tr,replace=T),],log_te[-ins_te,])
+
+CV_neural(retrain19,retest19,layer=1,nodes=35,fold=3)
+CV_neural(retrain28,retest28,layer=1,nodes=30,fold=3)
+CV_neural(retrain37,retest37,layer=2,nodes=15,fold=3)
+
+cv_gamma_svm(retrain19,retest19,50,3,1/57)
+cv_gamma_svm(retrain28,retest28,50,3,1/57)
+cv_gamma_svm(retrain37,retest37,50,3,1/57)
+
+ cv_error_tree(retrain19,retest19,0.015,3)
+ cv_error_tree(retrain28,retest28,0.014,3)
+ cv_error_tree(retrain37,retest37,0.004,3)
+```
+
+```{r}
+poly_result37=lapply(svmcosts,cv_cost_svm,datatrain=retrain37,datatest=retest37,kernel='polynomial',fold=3)
+radial_result37=lapply(svmcosts,cv_cost_svm,datatrain=retrain37,datatest=retest37,kernel='radial',fold=3)
+linear_result37=lapply(svmcosts,cv_cost_svm,datatrain=retrain37,datatest=retest37,kernel='linear',fold=3)
+
+poly_result28=lapply(svmcosts,cv_cost_svm,datatrain=retrain28,datatest=retest28,kernel='polynomial',fold=3)
+radial_result28=lapply(svmcosts,cv_cost_svm,datatrain=retrain28,datatest=retest28,kernel='radial',fold=3)
+linear_result28=lapply(svmcosts,cv_cost_svm,datatrain=retrain28,datatest=retest28,kernel='linear',fold=3)
+
+poly_result19=lapply(svmcosts,cv_cost_svm,datatrain=retrain19,datatest=retest19,kernel='polynomial',fold=3)
+radial_result19=lapply(svmcosts,cv_cost_svm,datatrain=retrain19,datatest=retest19,kernel='radial',fold=3)
+linear_result19=lapply(svmcosts,cv_cost_svm,datatrain=retrain19,datatest=retest19,kernel='linear',fold=3)
+
+polyf37=data.frame(matrix(unlist(poly_result37),nrow=11,byrow=T),cost=svmcosts,kernel='polynomial')
+radialf37=data.frame(matrix(unlist(radial_result37),nrow=11,byrow=T),cost=svmcosts,kernel='radial')
+linearf37=data.frame(matrix(unlist(linear_result37),nrow=11,byrow=T),cost=svmcosts,kernel='linear')
+svmcf37=rbind(radialf37,linearf37,polyf37)
+
+polyf28=data.frame(matrix(unlist(poly_result28),nrow=11,byrow=T),cost=svmcosts,kernel='polynomial')
+radialf28=data.frame(matrix(unlist(radial_result28),nrow=11,byrow=T),cost=svmcosts,kernel='radial')
+linearf28=data.frame(matrix(unlist(linear_result28),nrow=11,byrow=T),cost=svmcosts,kernel='linear')
+svmcf28=rbind(radialf28,linearf28,polyf28)
+
+polyf19=data.frame(matrix(unlist(poly_result19),nrow=11,byrow=T),cost=svmcosts,kernel='polynomial')
+radialf19=data.frame(matrix(unlist(radial_result19),nrow=11,byrow=T),cost=svmcosts,kernel='radial')
+linearf19=data.frame(matrix(unlist(linear_result19),nrow=11,byrow=T),cost=svmcosts,kernel='linear')
+svmcf19=rbind(radialf19,linearf19,polyf19)
+
+g1=ggplot(svmcf37)+geom_line(aes(cost,X1,color=kernel))+geom_line(aes(cost,X2,color=kernel),linetype='dashed') +ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+
+  ggtitle('error rate for different cost')+ylab('Error rate')
+
+g2=ggplot(svmcf28)+geom_line(aes(cost,X1,color=kernel))+geom_line(aes(cost,X2,color=kernel),linetype='dashed') +ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+
+  ggtitle('error rate for different cost')+ylab('Error rate')
+
+g3=ggplot(svmcf19)+geom_line(aes(cost,X1,color=kernel))+geom_line(aes(cost,X2,color=kernel),linetype='dashed') +ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+
+  ggtitle('error rate for different cost')+ylab('Error rate')
+
+
+grid.arrange(g1,g2,g3,nrow=2)
+```
+
+```{r}
+gamma_result37=lapply(gammas,cv_gamma_svm,datatrain=retrain37,datatest=retest37,cost=50,fold=3)
+gamma_result28=lapply(gammas,cv_gamma_svm,datatrain=retrain28,datatest=retest28,cost=50,fold=3)
+gamma_result19=lapply(gammas,cv_gamma_svm,datatrain=retrain19,datatest=retest19,cost=50,fold=3)
+gammadf37=data.frame(matrix(unlist(gamma_result37),nrow=7,byrow=T),gamma=gammas)
+gammadf28=data.frame(matrix(unlist(gamma_result28),nrow=7,byrow=T),gamma=gammas)
+gammadf19=data.frame(matrix(unlist(gamma_result19),nrow=7,byrow=T),gamma=gammas)
+g4=ggplot(gammadf37)+geom_line(aes(gamma,X1)) +geom_line(aes(gamma,X2),linetype='dashed')+ylab('Error') +ggtitle('error rate for different gamma')
+g5=ggplot(gammadf28)+geom_line(aes(gamma,X1)) +geom_line(aes(gamma,X2),linetype='dashed')+ylab('Error') +ggtitle('error rate for different gamma')
+g6=ggplot(gammadf19)+geom_line(aes(gamma,X1)) +geom_line(aes(gamma,X2),linetype='dashed')+ylab('Error') +ggtitle('error rate for different gamma')
+grid.arrange(g4,g5,g6,nrow=2)
+```
+
+```{r}
+deg_result37=lapply(degrees,cv_degree_svm,datatrain=retrain37,datatest=retest37,cost=50,fold=3)
+deg_result28=lapply(degrees,cv_degree_svm,datatrain=retrain28,datatest=retest28,cost=50,fold=3)
+deg_result19=lapply(degrees,cv_degree_svm,datatrain=retrain19,datatest=retest19,cost=50,fold=3)
+degdf37=data.frame(matrix(unlist(deg_result37),nrow=10,byrow=T),degree=degrees)
+degdf28=data.frame(matrix(unlist(deg_result28),nrow=10,byrow=T),degree=degrees)
+degdf19=data.frame(matrix(unlist(deg_result19),nrow=10,byrow=T),degree=degrees)
+g7=ggplot(degdf37)+geom_line(aes(degree,X1))+geom_line(aes(degree,X2),linetype='dashed') +ylab('Error') +ggtitle('error rate for different degree')
+g8=ggplot(degdf28)+geom_line(aes(degree,X1))+geom_line(aes(degree,X2),linetype='dashed') +ylab('Error') +ggtitle('error rate for different degree')
+g9=ggplot(degdf19)+geom_line(aes(degree,X1))+geom_line(aes(degree,X2),linetype='dashed') +ylab('Error') +ggtitle('error rate for different degree')
+grid.arrange(g7,g8,g9,nrow=2)
+```
+
+
+
+##neuralnetwork
+
+```{r}
+lay1_result37=lapply(nodes,CV_neural,datatrain=retrain37,datatest=retest37,layer=1,fold=3)
+lay1_result28=lapply(nodes,CV_neural,datatrain=retrain28,datatest=retest28,layer=1,fold=3)
+lay1_result19=lapply(nodes,CV_neural,datatrain=retrain19,datatest=retest19,layer=1,fold=3)
+lay1f37=data.frame(matrix(unlist(lay1_result37),nrow=9,byrow=T),nodes,layer='layer1')
+lay1f28=data.frame(matrix(unlist(lay1_result28),nrow=9,byrow=T),nodes,layer='layer1')
+lay1f19=data.frame(matrix(unlist(lay1_result19),nrow=9,byrow=T),nodes,layer='layer1')
+
+
+lay2_result37=lapply(nodes,CV_neural,datatrain=retrain37,datatest=retest37,layer=2,fold=3)
+lay2_result28=lapply(nodes,CV_neural,datatrain=retrain28,datatest=retest28,layer=2,fold=3)
+lay2_result19=lapply(nodes,CV_neural,datatrain=retrain19,datatest=retest19,layer=2,fold=3)
+lay2f37=data.frame(matrix(unlist(lay2_result37),nrow=9,byrow=T),nodes,layer='layer2')
+lay2f28=data.frame(matrix(unlist(lay2_result28),nrow=9,byrow=T),nodes,layer='layer2')
+lay2f19=data.frame(matrix(unlist(lay2_result19),nrow=9,byrow=T),nodes,layer='layer2')
+layf37=rbind(lay1f37,lay2f37)
+layf28=rbind(lay1f28,lay2f28)
+layf19=rbind(lay1f19,lay2f19)
+g10=ggplot(data=layf37)+geom_line(aes(nodes,X1,color=layer)) +geom_line(aes(nodes,X2,color=layer),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different nodes')
+g11=ggplot(layf28)+geom_line(aes(nodes,X1,color=layer)) +geom_line(aes(nodes,X2,color=layer),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different nodes')
+g12=ggplot(layf19)+geom_line(aes(nodes,X1,color=layer)) +geom_line(aes(nodes,X2,color=layer),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different nodes')
+grid.arrange(g10,g11,g12,nrow=2)
+```
+
+
+
+##d tree
+```{r}
+tree_result37= lapply(cps,cv_error_tree,datatrain=train37,datatest=retest37,fold=3)
+tree_result28= lapply(cps,cv_error_tree,datatrain=train28,datatest=retest28,fold=3)
+tree_result19= lapply(cps,cv_error_tree,datatrain=train19,datatest=retest19,fold=3)
+treef37=data.frame(matrix(unlist(tree_result37),nrow=51,byrow=T),cp=cps)
+treef28=data.frame(matrix(unlist(tree_result28),nrow=51,byrow=T),cp=cps)
+treef19=data.frame(matrix(unlist(tree_result19),nrow=51,byrow=T),cp=cps)
+
+g13=ggplot(treef37)+geom_line(aes(cp,X1)) +geom_line(aes(cp,X2),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different tree size')
+g14=ggplot(treef28)+geom_line(aes(cp,X1)) +geom_line(aes(cp,X2),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different tree size')
+g15=ggplot(treef19)+geom_line(aes(cp,X1)) +geom_line(aes(cp,X2),linetype='dashed')+ylab('Error') +theme(legend.position=c(0.98,0.98), legend.justification=c(1,1))+ggtitle('error rate for different tree size')
+grid.arrange(g13,g14,g15,nrow=2)
+```
+
+
