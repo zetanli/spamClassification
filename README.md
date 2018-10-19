@@ -6,4 +6,4 @@ Consider the email spam dataset we given. This consists of 4601 email messages, 
 
 **Problem Description**  
 
-We compared results from 3 classification methods, SVM, Neural Network and Decision Tree to predict the type of email from email features. We applied CV to select tuning parameters. We also subsample rom the spam instances in the training set.
+We compared results from 3 classification methods, SVM, Neural Network and Decision Tree to predict the type of email from email features. We applied CV to select tuning parameters. We also subsample from the spam instances in the training set to see the results from imbalanced data.
